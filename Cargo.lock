@@ -264,6 +264,7 @@ dependencies = [
  "encoding_rs",
  "image",
  "packed_struct",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -1,0 +1,29 @@
+<html>
+  <head>
+    <title>.puz file generator</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <div class="metadata">
+      <div>Title</div>
+      <div><input name="title" /></div>
+      <div>Author</div>
+      <div><input name="author" /></div>
+      <div>Copyright</div>
+      <div><input name="copyright" /></div>
+      <div>Notes</div>
+      <div><input name="notes" /></div>
+    </div>
+    <input type="file" />
+    <div>
+      Across<br />
+      <textarea name="across_clues"></textarea>
+    </div>
+    <div>
+      Down<br />
+      <textarea name="down_clues"></textarea>
+    </div>
+    <input id="submit" type="button" value="Generate .puz"/>
+    <script src="/index.js" type="module"></script>
+  </body>
+</html>

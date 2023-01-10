@@ -33,7 +33,6 @@ pub fn load_crossword(filename: &str) -> Result<CrosswordGrid, ()> {
                 .filter(|px| px.2.0[0] <= DARK_THRESHOLD)
                 .count();
             let is_wall = set >= sq / 2;
-            // println!("[{row},{col}]: {set}/{sq} => {is_wall}");
             cells.push(
                 if is_wall { CrosswordCell::Wall }
                 else { CrosswordCell::empty() }
