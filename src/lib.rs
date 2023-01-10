@@ -2,6 +2,7 @@ mod generate_puz;
 mod parse_grid;
 
 use std::fmt;
+use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 use crate::parse_grid::CrosswordGrid;
 
@@ -81,6 +82,7 @@ fn parse_clue_block(clue_block: &str) -> Result<Vec<(u16, String)>, &'static str
 }
 
 #[wasm_bindgen]
+#[derive(Deserialize)]
 pub struct CrosswordInput {
     image: Vec<u8>,
     across_clues: String,
@@ -92,15 +94,38 @@ pub struct CrosswordInput {
 }
 
 #[wasm_bindgen]
-pub fn generate_puz_file(input: CrosswordInput) -> Vec<u8> {
+impl CrosswordInput {
+    #[wasm_bindgen(constructor)]
+    pub fn new(blob: JsValue) -> CrosswordInput {
+        serde_wasm_bindgen::from_value(blob).unwrap()
+    }
+}
+
+#[wasm_bindgen]
+pub fn generate_puz_file(input: CrosswordInput) -> Result<Vec<u8>, String> {
+    set_panic_hook();
+
     let CrosswordInput { image, across_clues, down_clues, title, author, copyright, notes } = input;
-    let across_clues = parse_clue_block(&across_clues).unwrap();
-    let down_clues = parse_clue_block(&down_clues).unwrap();
-    let CrosswordGrid { width, height, cells } = parse_grid::load_crossword("puz.png").unwrap();
+    let across_clues = parse_clue_block(&across_clues)?;
+    let down_clues = parse_clue_block(&down_clues)?;
+    let img = image::load_from_memory(&image)
+        .map_err(|e| format!("could not load image: {e}"))?;
+    let CrosswordGrid { width, height, cells } = parse_grid::parse_crossword(img);
     let xword = Crossword {
         width, height, cells,
         title, author, copyright, notes,
         across_clues, down_clues,
     };
-    xword.as_puz()
+    Ok(xword.as_puz())
+}
+
+pub fn set_panic_hook() {
+    // When the `console_error_panic_hook` feature is enabled, we can call the
+    // `set_panic_hook` function at least once during initialization, and then
+    // we will get better error messages if our code ever panics.
+    //
+    // For more details see
+    // https://github.com/rustwasm/console_error_panic_hook#readme
+    #[cfg(feature = "console_error_panic_hook")]
+    console_error_panic_hook::set_once();
 }

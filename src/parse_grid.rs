@@ -1,5 +1,4 @@
-use image::io::Reader as ImageReader;
-use image::GenericImageView;
+use image::{DynamicImage, GenericImageView};
 use crate::CrosswordCell;
 
 const DARK_THRESHOLD: u8 = 0x80;
@@ -19,8 +18,7 @@ pub struct CrosswordGrid {
     pub cells: Vec<CrosswordCell>,
 }
 
-pub fn load_crossword(filename: &str) -> Result<CrosswordGrid, ()> {
-    let img = ImageReader::open(filename).unwrap().decode().unwrap();
+pub fn parse_crossword(img: DynamicImage) -> CrosswordGrid {
     let img = img.into_luma8();
     let dims = find_xword_dimensions(&img);
 
@@ -40,11 +38,11 @@ pub fn load_crossword(filename: &str) -> Result<CrosswordGrid, ()> {
         }
     }
 
-    Ok(CrosswordGrid {
+    CrosswordGrid {
         width: dims.width as u8,
         height: dims.height as u8,
         cells,
-    })
+    }
 }
 
 fn find_xword_dimensions(img: &image::GrayImage) -> CrosswordDimensions {
