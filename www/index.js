@@ -22,6 +22,19 @@ async function run() {
       downloadBlob(file_contents, "out.puz", "application/octet-stream");
       console.log(file_contents);
     });
+  document.getElementById("imgUpload")
+    .addEventListener("change", event => {
+      const imgPreview = document.getElementById("gridPreview");
+      const [file] = event.target.files;
+      if (file) {
+        imgPreview.src = URL.createObjectURL(file);
+        imgPreview.onload = function() {
+          URL.revokeObjectURL(imgPreview.src) // free memory
+        }
+      } else {
+        imgPreview.src = "#";
+      }
+    });
 }
 
 const downloadURL = (data, fileName) => {

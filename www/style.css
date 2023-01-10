@@ -1,4 +1,53 @@
+body {
+  font-family: Arial;
+}
+
 .metadata {
+  width: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
+}
+
+.metadata > div {
+  padding: 2px;
+}
+
+.metadata .label {
+  text-align: right;
+}
+
+.clues {
+  width: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.clues > div {
+  padding: 2px;
+}
+
+.clues textarea {
+  width: 200px;
+  height: 300px;
+}
+
+#gridPreview {
+  max-width: 200px;
+}
+
+img[src="#"] {
+    display: none;
+}
+
+input[type="submit"] {
+  align-self: center;
+  border-radius: 5px;
+  background-color: #7f5ecf;
+  font-weight: bold;
+  font-size: 1.5em;
+  border: 0;
+  padding: 8px 12px;
+  margin-top: 5px;
+  color: white;
+  cursor: pointer;
 }
