@@ -41,6 +41,11 @@ async function run() {
       closeModal();
     }
   });
+  document.addEventListener("keyup", event => {
+    if(event.key === "Escape") {
+      closeModal();
+    }
+  });
 }
 
 const closeModal = () => {
