@@ -16,7 +16,7 @@
         <div class="label">Notes</div>
         <div><input name="notes" /></div>
       </div>
-      <h3>Upload Grid Screenshot</h3>
+      <h3>Upload Grid Screenshot <a href="javascript:openModal()">&#9432;</a></h3>
       <input accept="image/*" name="image" type="file" id="imgUpload" />
       <br />
       <img id="gridPreview" src="#" alt="grid preview" />
@@ -33,6 +33,28 @@
       </div>
       <input type="submit" value="Generate .puz"/>
     </form>
+    <div class="modal closed" id="modal">
+      <div id="modal-inner">
+        <p>Upload an image of your crossword grid, to be converted into a .puz file.
+        Note that only the shape of the grid is read: any answers in the grid will be discarded.</p>
+        <p>The grid reader can be finicky!
+        For best results, make sure the grid is aligned with the edges of your image, and there is no extra border around the edges of your image.</p>
+        <div class="grid-examples">
+          <div class="grid-bad">
+            <img src="/media/bad_noise.png" />
+            <br />&#x274C; Make sure there's no dark regions along the outside edge of your image
+          </div>
+          <div class="grid-bad">
+            <img src="/media/bad_tilted.png" />
+            <br />&#x274C; Make sure the grid isn't tilted
+          </div>
+          <div class="grid-good">
+            <img src="/media/good.png" />
+            <br />&#x2705; Good
+          </div>
+        </div>
+      </div>
+    </div>
     <script src="/index.js" type="module"></script>
   </body>
 </html>

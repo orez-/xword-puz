@@ -39,6 +39,11 @@ img[src="#"] {
     display: none;
 }
 
+input[type="file"] {
+  border: 1px solid darkgray;
+  padding: 3px;
+}
+
 input[type="submit"] {
   align-self: center;
   border-radius: 5px;
@@ -50,4 +55,63 @@ input[type="submit"] {
   margin-top: 5px;
   color: white;
   cursor: pointer;
+}
+
+.grid-examples {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  width: 0;
+}
+
+.grid-examples > div {
+  margin: 5px;
+  padding: 15px;
+  width: 200px;
+}
+
+.grid-examples img {
+  width: 200px;
+  margin-bottom: 5px;
+}
+
+.grid-good {
+  background-color: #a0daa0;
+}
+
+.grid-bad {
+  background-color: #daa0a0;
+}
+
+.modal {
+  position: fixed;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #80808080;
+  transition: opacity 250ms;
+  opacity: 1;
+  visibility: hidden;
+}
+
+.modal.closed {
+  opacity: 0;
+}
+
+.modal > div {
+  width: 720px;
+  border: 2px solid darkgray;
+  padding: 20px;
+  background-color: white;
+}
+
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
