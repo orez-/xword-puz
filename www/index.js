@@ -5,6 +5,7 @@ async function run() {
   document.getElementById("form")
     .addEventListener("submit", async event => {
       event.preventDefault();
+      clearErrors();
       const formData = new FormData(event.target);
       const {
         across_clues, down_clues,
@@ -18,9 +19,19 @@ async function run() {
         title, author, copyright, notes,
         image: image_array,
       });
-      let file_contents = generate_puz_file(input);
+      let file_contents;
+      try {
+        file_contents = generate_puz_file(input);
+      } catch (exc) {
+        console.log(exc);
+        for (let [key, value] of exc) {
+          let node = document.getElementById(`${key}_error`);
+          node.innerText = value;
+          node.style.visibility = "visible";
+        }
+        return;
+      }
       downloadBlob(file_contents, "out.puz", "application/octet-stream");
-      console.log(file_contents);
     });
   document.getElementById("imgUpload")
     .addEventListener("change", event => {
@@ -77,6 +88,13 @@ const downloadBlob = (data, fileName, mimeType) => {
   const url = window.URL.createObjectURL(blob);
   downloadURL(url, fileName);
   setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+}
+
+const clearErrors = () => {
+  for (let elem of document.getElementsByClassName("error")) {
+    elem.innerText = "";
+    elem.style.visibility = "hidden";
+  }
 }
 
 run();

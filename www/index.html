@@ -18,6 +18,7 @@
       </div>
       <h3>Upload Grid Screenshot <a href="javascript:openModal()">&#9432;</a></h3>
       <input accept="image/*" name="image" type="file" id="imgUpload" />
+      <div id="image_error" class="error"></div>
       <br />
       <img id="gridPreview" src="#" alt="grid preview" />
       <h3>Clues</h3>
@@ -25,10 +26,12 @@
         <div>
           Across<br />
           <textarea name="across_clues"></textarea>
+          <div id="across_clues_error" class="error"></div>
         </div>
         <div>
           Down<br />
           <textarea name="down_clues"></textarea>
+          <div id="down_clues_error" class="error"></div>
         </div>
       </div>
       <input type="submit" value="Generate .puz"/>

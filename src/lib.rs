@@ -163,7 +163,8 @@ pub struct CrosswordInput {
 impl CrosswordInput {
     #[wasm_bindgen(constructor)]
     pub fn new(blob: JsValue) -> CrosswordInput {
-        serde_wasm_bindgen::from_value(blob).unwrap()
+        serde_wasm_bindgen::from_value(blob)
+            .expect("crossword input should match required shape")
     }
 }
 
