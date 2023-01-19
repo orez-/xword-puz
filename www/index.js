@@ -24,9 +24,15 @@ async function run() {
         file_contents = generate_puz_file(input);
       } catch (exc) {
         console.log(exc);
-        for (let [key, value] of exc) {
-          let node = document.getElementById(`${key}_error`);
-          node.innerText = value;
+        if (exc instanceof Map) {
+          for (let [key, value] of exc) {
+            let node = document.getElementById(`${key}_error`);
+            node.innerText = value;
+            node.style.visibility = "visible";
+          }
+        } else {
+          let node = document.getElementById("general_error");
+          node.innerText = "Unexpected error";
           node.style.visibility = "visible";
         }
         return;
