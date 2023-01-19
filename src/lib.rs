@@ -1,7 +1,9 @@
 mod generate_puz;
 mod parse_grid;
 
+use std::collections::HashMap;
 use std::fmt;
+use std::iter::zip;
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 use crate::parse_grid::CrosswordGrid;
@@ -16,6 +18,10 @@ pub enum CrosswordCell {
 impl CrosswordCell {
     pub fn empty() -> Self {
         Self::Char('A')
+    }
+
+    pub fn is_wall(&self) -> bool {
+        matches!(self, CrosswordCell::Wall)
     }
 }
 
@@ -52,6 +58,65 @@ impl fmt::Debug for Crossword {
     }
 }
 
+impl Crossword {
+    fn validate(&self) -> Result<(), JsErrors> {
+        let mut issues = JsErrors::new();
+        let (across, down) = self.expected_grid_nums();
+        if let Err(err) = Self::validate_clues(&across, &self.across_clues) {
+            issues.push("across_clues", err);
+        }
+        if let Err(err) = Self::validate_clues(&down, &self.down_clues) {
+            issues.push("down_clues", err);
+        }
+
+        if issues.is_empty() { Ok(()) }
+        else { Err(issues) }
+    }
+
+    fn validate_clues(expected: &[u16], actual: &[(u16, String)]) -> Result<(), String> {
+        if actual.windows(2).any(|w| w[0] >= w[1]) {
+            return Err("found misordered clues. Clue numbers must be strictly increasing".into());
+        }
+        if expected.len() != actual.len() {
+            return Err(format!("expected {} clues, found {}", expected.len(), actual.len()));
+        }
+        let mismatch =
+            zip(expected, actual)
+            .map(|(a, (b, _))| (a, b))
+            .filter(|(a, b)| a != b)
+            .next();
+        if let Some((exp, act)) = mismatch {
+            return if exp < act { Err(format!("missing clue {exp}")) }
+            else { Err(format!("found extraneous clue {act}")) };
+        }
+        Ok(())
+    }
+
+    fn expected_grid_nums(&self) -> (Vec<u16>, Vec<u16>) {
+        let width = self.width as usize;
+        let mut across = Vec::new();
+        let mut down = Vec::new();
+        let mut num = 1;
+        for (idx, cell) in self.cells.iter().enumerate() {
+            if cell.is_wall() { continue; }
+            let x = idx % width;
+            let y = idx / width;
+            let is_across = x == 0 || self.cells[idx - 1].is_wall();
+            let is_down = y == 0 || self.cells[idx - width].is_wall();
+            if is_across {
+                across.push(num);
+            }
+            if is_down {
+                down.push(num);
+            }
+            if is_across || is_down {
+                num += 1;
+            }
+        }
+        (across, down)
+    }
+}
+
 fn parse_clue_prefix(line: &str) -> Option<(u16, String)> {
     if let Some((num, clue)) = line.trim_start().split_once('.') {
         if let Ok(num) = num.parse() {
@@ -78,6 +143,7 @@ fn parse_clue_block(clue_block: &str) -> Result<Vec<(u16, String)>, &'static str
             cur_clue.push_str(line);
         }
     }
+    clues.push((cur_num, cur_clue));
     Ok(clues)
 }
 
@@ -101,21 +167,59 @@ impl CrosswordInput {
     }
 }
 
+#[derive(Default)]
+pub struct JsErrors {
+    errors: HashMap<String, String>,
+}
+
+impl JsErrors {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+
+    fn push(&mut self, section: &str, msg: String) {
+        self.errors.insert(section.into(), msg);
+    }
+}
+
+impl Into<JsValue> for JsErrors {
+    fn into(self) -> JsValue {
+        serde_wasm_bindgen::to_value(&self.errors)
+            .expect("map of strings to strings should be serializable")
+    }
+}
+
 #[wasm_bindgen]
-pub fn generate_puz_file(input: CrosswordInput) -> Result<Vec<u8>, String> {
+pub fn generate_puz_file(input: CrosswordInput) -> Result<Vec<u8>, JsErrors> {
     set_panic_hook();
 
+    let mut errors = JsErrors::new();
     let CrosswordInput { image, across_clues, down_clues, title, author, copyright, notes } = input;
-    let across_clues = parse_clue_block(&across_clues)?;
-    let down_clues = parse_clue_block(&down_clues)?;
-    let img = image::load_from_memory(&image)
-        .map_err(|e| format!("could not load image: {e}"))?;
+    let across_clues = parse_clue_block(&across_clues);
+    if let Err(msg) = across_clues {
+        errors.push("across_clues", msg.into());
+    }
+    let down_clues = parse_clue_block(&down_clues);
+    if let Err(msg) = down_clues {
+        errors.push("down_clues", msg.into());
+    }
+    let img = image::load_from_memory(&image);
+    if let Err(ref msg) = img {
+        errors.push("image", format!("could not load image: {msg}"));
+    }
+    let (Ok(across_clues), Ok(down_clues), Ok(img)) = (across_clues, down_clues, img)
+        else { return Err(errors) };
     let CrosswordGrid { width, height, cells } = parse_grid::parse_crossword(img);
     let xword = Crossword {
         width, height, cells,
         title, author, copyright, notes,
         across_clues, down_clues,
     };
+    xword.validate()?;
     Ok(xword.as_puz())
 }
 
