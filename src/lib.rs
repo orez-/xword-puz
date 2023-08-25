@@ -1,11 +1,12 @@
 mod generate_puz;
+mod multi_error;
 
+use std::iter::zip;
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 use serde_wasm_bindgen::Error as SerdeError;
-use std::collections::HashMap;
-use std::iter::zip;
 use wasm_bindgen::prelude::*;
+use crate::multi_error::MultiError;
 
 #[derive(Debug)]
 pub enum CrosswordCell {
@@ -36,32 +37,6 @@ impl<'de> Deserialize<'de> for CrosswordCell {
             }
             None => CrosswordCell::Wall,
         })
-    }
-}
-
-#[derive(Default)]
-pub struct MultiError {
-    errors: HashMap<String, String>,
-}
-
-impl MultiError {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.errors.is_empty()
-    }
-
-    fn push(&mut self, section: &str, msg: String) {
-        self.errors.insert(section.into(), msg);
-    }
-}
-
-impl Into<JsValue> for MultiError {
-    fn into(self) -> JsValue {
-        serde_wasm_bindgen::to_value(&self.errors)
-            .expect("map of strings to strings should be serializable")
     }
 }
 
