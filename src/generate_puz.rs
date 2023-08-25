@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::iter::from_fn;
 use packed_struct::prelude::*;
 use encoding_rs::WINDOWS_1252;
@@ -123,7 +124,6 @@ struct PreserializedCrossword<'a> {
     notes: Cow<'a, [u8]>,
 }
 
-
 impl Crossword {
     fn preserialize(&self) -> PreserializedCrossword<'_> {
         let solution = self.grid.iter().map(|cell| match cell {
@@ -182,6 +182,50 @@ impl Crossword {
             puz.extend(line.into_iter());
             puz.push(0);
         }
+        puz.extend(build_rebus_sections(self));
         puz
     }
+}
+
+fn build_rebus_sections(xword: &Crossword) -> Vec<u8> {
+    let mut max_rebus = 1;  // the musician?
+    let mut seen_rebus: HashMap<&str, u8> = HashMap::new();
+    let mut rebus_words = Vec::new();
+
+    let rebus_grid: Vec<_> = xword.grid.iter().map(|cell| {
+        match cell {
+            CrosswordCell::Rebus(s) => {
+                *seen_rebus.entry(s)
+                    .or_insert_with(|| {
+                        if max_rebus >= 100 {
+                            // TODO: ideally validation catches this.
+                            panic!("hard limit of 99 unique rebuses");
+                        }
+                        let num = max_rebus;
+                        rebus_words.extend(format!("{num:>2}:{s};").bytes());
+                        max_rebus += 1;
+                        num
+                    })
+            }
+            _ => 0,
+        }
+    }).collect();
+
+    let mut out = Vec::new();
+    if seen_rebus.is_empty() { return out }
+    out.extend(extra_section(*b"GRBS", &rebus_grid));
+    out.extend(extra_section(*b"RTBL", &rebus_words));
+    out
+}
+
+fn extra_section(title: [u8; 4], data: &[u8]) -> Vec<u8> {
+    let len = data.len() as u16;
+    let checksum = cksum_region(data, 0);
+    let mut out = Vec::new();
+    out.extend(title);
+    out.extend(len.to_le_bytes());
+    out.extend(checksum.to_le_bytes());
+    out.extend(data);
+    out.push(0);
+    out
 }

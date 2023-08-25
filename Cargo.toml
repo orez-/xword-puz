@@ -1,6 +1,6 @@
 [package]
 name = "xword-puz"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 description = "Rust wasm library for generating `.puz` crossword files."
 repository = "https://github.com/orez-/xword-puz"
