@@ -6,7 +6,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 use serde_wasm_bindgen::Error as SerdeError;
 use wasm_bindgen::prelude::*;
-use crate::multi_error::MultiError;
+pub use crate::multi_error::MultiError;
 
 #[derive(Debug)]
 pub enum CrosswordCell {
@@ -144,5 +144,37 @@ impl TryFrom<JsValue> for Crossword {
             ));
         }
         Ok(this)
+    }
+}
+
+// ===
+
+/// Simple data struct for the crossword object.
+/// Can be converted into a `Crossword`.
+pub struct CrosswordArgs {
+    pub width: u8,
+    pub height: u8,
+    pub grid: Vec<CrosswordCell>,
+    pub across_clues: Vec<(u16, String)>,
+    pub down_clues: Vec<(u16, String)>,
+    pub title: String,
+    pub author: String,
+    pub copyright: String,
+    pub notes: String,
+}
+
+impl From<CrosswordArgs> for Crossword {
+    fn from(args: CrosswordArgs) -> Crossword {
+        Crossword {
+            width: args.width,
+            height: args.height,
+            grid: args.grid,
+            across_clues: args.across_clues,
+            down_clues: args.down_clues,
+            title: args.title,
+            author: args.author,
+            copyright: args.copyright,
+            notes: args.notes,
+        }
     }
 }
