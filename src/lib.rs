@@ -59,14 +59,6 @@ pub struct Crossword {
     notes: String,
 }
 
-#[wasm_bindgen]
-impl Crossword {
-    #[wasm_bindgen(constructor)]
-    pub fn new(blob: JsValue) -> Result<Crossword, SerdeError> {
-        blob.try_into()
-    }
-}
-
 impl Crossword {
     pub fn validate(&self) -> Result<(), MultiError> {
         let mut issues = MultiError::new();
@@ -145,6 +137,14 @@ impl TryFrom<JsValue> for Crossword {
         }
         Ok(this)
     }
+}
+
+#[wasm_bindgen]
+pub fn generate_puz(blob: JsValue) -> Result<Vec<u8>, MultiError> {
+    let xword: Crossword = blob.try_into()
+        .expect("js obect should be well-formed");
+    xword.validate()?;
+    Ok(xword.as_puz())
 }
 
 // ===
