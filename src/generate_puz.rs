@@ -126,13 +126,14 @@ struct PreserializedCrossword<'a> {
 
 impl Crossword {
     fn preserialize(&self) -> PreserializedCrossword<'_> {
-        let solution = self.cells.iter().map(|cell| match cell {
+        let solution = self.grid.iter().map(|cell| match cell {
             CrosswordCell::Char(c) => *c as u8,
             CrosswordCell::Rebus(s) => s.bytes().next().unwrap(),
             CrosswordCell::Wall => b'.',
+            CrosswordCell::Empty => b'A', // XXX: ???
         }).collect();
 
-        let grid = self.cells.iter().map(|cell| match cell {
+        let grid = self.grid.iter().map(|cell| match cell {
             CrosswordCell::Wall => b'.',
             _ => b'-',
         }).collect();
