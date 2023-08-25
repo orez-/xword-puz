@@ -107,7 +107,7 @@ fn cksum_region(base: &[u8], mut cksum: u16) -> u16 {
         } else {
             cksum >>= 1;
         }
-        cksum += byte as u16;
+        cksum = cksum.wrapping_add(byte as u16);
     }
     cksum
 }
@@ -188,7 +188,7 @@ impl Crossword {
 }
 
 fn build_rebus_sections(xword: &Crossword) -> Vec<u8> {
-    let mut max_rebus = 1;  // the musician?
+    let mut max_rebus = 0;  // the musician?
     let mut seen_rebus: HashMap<&str, u8> = HashMap::new();
     let mut rebus_words = Vec::new();
 
@@ -199,12 +199,11 @@ fn build_rebus_sections(xword: &Crossword) -> Vec<u8> {
                     .or_insert_with(|| {
                         if max_rebus >= 100 {
                             // TODO: ideally validation catches this.
-                            panic!("hard limit of 99 unique rebuses");
+                            panic!("hard limit of 100 unique rebuses");
                         }
-                        let num = max_rebus;
-                        rebus_words.extend(format!("{num:>2}:{s};").bytes());
+                        rebus_words.extend(format!("{max_rebus:>2}:{s};").bytes());
                         max_rebus += 1;
-                        num
+                        max_rebus
                     })
             }
             _ => 0,
@@ -228,4 +227,29 @@ fn extra_section(title: [u8; 4], data: &[u8]) -> Vec<u8> {
     out.extend(data);
     out.push(0);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_smol_rebus() {
+        let xword = Crossword {
+            width: 2,
+            height: 2,
+            grid: vec![
+                CrosswordCell::Rebus("ON".to_string()), CrosswordCell::Rebus("TO".to_string()),
+                CrosswordCell::Rebus("LY".to_string()), CrosswordCell::Rebus("ON".to_string()),
+            ],
+            across_clues: vec![(1, "Aware of".to_string()), (3, "French city".to_string())],
+            down_clues: vec![(1, "Solely".to_string()), (2, "Animated sort".to_string())],
+            title: "smol".to_string(),
+            author: "me".to_string(),
+            copyright: String::new(),
+            notes: String::new(),
+        };
+        let puz = xword.as_puz();
+        assert_eq!(puz, include_bytes!("test_files/smol.puz"));
+    }
 }
