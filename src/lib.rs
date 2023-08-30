@@ -142,7 +142,7 @@ impl TryFrom<JsValue> for Crossword {
 #[wasm_bindgen]
 pub fn generate_puz(blob: JsValue) -> Result<Vec<u8>, MultiError> {
     let xword: Crossword = blob.try_into()
-        .expect("js obect should be well-formed");
+        .expect("js object should be well-formed");
     xword.validate()?;
     Ok(xword.as_puz())
 }
