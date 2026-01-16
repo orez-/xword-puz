@@ -124,9 +124,13 @@ impl CrosswordArgs {
                 height: self.height,
                 grid_len: self.grid.len(),
             };
-            issues.insert("grid_size", err);
+            issues.insert("grid", err);
             // catastrophic issue: return early.
             return Err(issues);
+        }
+
+        if let Err(err) = self.validate_rebuses() {
+            issues.insert("grid", err);
         }
 
         let (across, down) = self.expected_grid_nums();
@@ -162,6 +166,22 @@ impl CrosswordArgs {
             notes,
         };
         Ok(xword)
+    }
+
+    fn validate_rebuses(&self) -> Result<(), ValidationError> {
+        let mut seen_rebus = std::collections::HashSet::new();
+
+        for cell in &self.grid {
+            if let CrosswordCell::Rebus(s) = cell {
+                seen_rebus.insert(s);
+            }
+        }
+
+        let rebus_count = seen_rebus.len();
+        if rebus_count >= 100 {
+            return Err(ValidationError::TooManyRebuses(rebus_count));
+        }
+        Ok(())
     }
 
     fn validate_clues(expected: &[u16], actual: &[(u16, String)]) -> Result<(), ValidationError> {

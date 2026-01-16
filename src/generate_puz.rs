@@ -201,10 +201,6 @@ fn build_rebus_sections(xword: &Crossword) -> Vec<u8> {
             CrosswordCell::Rebus(s) => {
                 *seen_rebus.entry(s)
                     .or_insert_with(|| {
-                        if max_rebus >= 100 {
-                            // TODO: ideally validation catches this.
-                            panic!("hard limit of 100 unique rebuses");
-                        }
                         rebus_words.extend(format!("{max_rebus:>2}:{s};").bytes());
                         max_rebus += 1;
                         max_rebus
@@ -264,7 +260,7 @@ mod tests {
         // one-long areas do NOT get clues.
         let xword = CrosswordArgs {
             width: 2,
-            height: 1,
+            height: 2,
             grid: vec![
                 CrosswordCell::Char('A'), CrosswordCell::Char('B'),
                 CrosswordCell::Char('C'), CrosswordCell::Wall,
