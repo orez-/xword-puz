@@ -9,19 +9,18 @@ cargo add --git https://github.com/orez-/xword-puz.git
 ```
 
 ```rust
-let xword: Crossword = CrosswordArgs {
+let xword = CrosswordArgs {
     width, height, grid,
     title, author, copyright, notes,
     across_clues, down_clues,
-}.into();
-xword.validate()?;
-let puz_contents = xword.to_puz();
+};
+let puz_contents = xword.validate()?.to_puz();
 ```
 
 ## Usage (wasm library)
 
 ```
-npm install --save https://github.com/orez-/xword-puz/releases/download/0.1.3/xword-puz-0.1.3.tgz
+npm install --save https://github.com/orez-/xword-puz/releases/download/0.2.0/xword-puz-0.2.0.tgz
 ```
 
 ```js
@@ -34,3 +33,11 @@ const puzContents = generate_puz({
     acrossClues, downClues,
 });
 ```
+
+## `CrosswordArgs`
+
+- `grid` is a list of fill for crossword cells, represented left to right, top to bottom.
+  - In javascript, a crossword cell is either a string of its fill, or `null` for walls.
+  - `grid` must contain exactly `width * height` elements.
+- `acrossClues` and `downClues` are lists of `number, clue` pairs.
+- `title`, `author`, `copyright`, and `notes` are strings of metadata about the puzzle.

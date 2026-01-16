@@ -114,7 +114,7 @@ pub struct CrosswordArgs {
 }
 
 impl CrosswordArgs {
-    fn validate(self) -> Result<Crossword, MultiError> {
+    pub fn validate(self) -> Result<Crossword, MultiError> {
         let mut issues = MultiError::new();
 
         let expected_len = self.width as usize * self.height as usize;
@@ -209,6 +209,7 @@ impl CrosswordArgs {
     /// Given the shape of the grid, these are the numbers of each clue.
     fn expected_grid_nums(&self) -> (Vec<u16>, Vec<u16>) {
         let width = self.width as usize;
+        let height = self.height as usize;
         let mut across = Vec::new();
         let mut down = Vec::new();
         let mut num = 1;
@@ -216,8 +217,13 @@ impl CrosswordArgs {
             if cell.is_wall() { continue; }
             let x = idx % width;
             let y = idx / width;
-            let is_across = x == 0 || self.grid[idx - 1].is_wall();
-            let is_down = y == 0 || self.grid[idx - width].is_wall();
+            let left_wall = x == 0 || self.grid[idx - 1].is_wall();
+            let right_wall = x + 1 == width || self.grid[idx + 1].is_wall();
+            let up_wall = y == 0 || self.grid[idx - width].is_wall();
+            let down_wall = y + 1 == height || self.grid[idx + width].is_wall();
+            // one-long areas do NOT get clues.
+            let is_across = left_wall && !right_wall;
+            let is_down = up_wall && !down_wall;
             if is_across {
                 across.push(num);
             }
