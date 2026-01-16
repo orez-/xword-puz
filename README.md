@@ -15,7 +15,7 @@ let xword: Crossword = CrosswordArgs {
     across_clues, down_clues,
 }.into();
 xword.validate()?;
-let puz_contents = xword.as_puz();
+let puz_contents = xword.to_puz();
 ```
 
 ## Usage (wasm library)

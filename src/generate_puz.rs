@@ -128,7 +128,7 @@ impl Crossword {
     fn preserialize(&self) -> PreserializedCrossword<'_> {
         let solution = self.grid.iter().map(|cell| match cell {
             CrosswordCell::Char(c) => *c as u8,
-            CrosswordCell::Rebus(s) => s.bytes().next().unwrap(),
+            CrosswordCell::Rebus(s) => s.bytes().next().expect("rebus may not be empty"),
             CrosswordCell::Wall => b'.',
             CrosswordCell::Empty => b'A', // XXX: ???
         }).collect();
@@ -138,6 +138,10 @@ impl Crossword {
             _ => b'-',
         }).collect();
 
+        // Clues are represented as a single list with no numbers.
+        // Numbers are inferred from the shape of the grid.
+        // Both Across and Down clues are intermingled(!?): the clues
+        // are in numeric order, favoring Across.
         let mut across = self.across_clues.iter().peekable();
         let mut down = self.down_clues.iter().peekable();
         let clues = from_fn(|| {
@@ -169,7 +173,7 @@ impl Crossword {
         }
     }
 
-    pub fn as_puz(&self) -> Vec<u8> {
+    pub fn to_puz(&self) -> Vec<u8> {
         let this = self.preserialize();
         let mut puz = Header::new(&this).pack().unwrap().to_vec();
         puz.extend(this.solution);
@@ -232,10 +236,11 @@ fn extra_section(title: [u8; 4], data: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CrosswordArgs;
 
     #[test]
     fn test_smol_rebus() {
-        let xword = Crossword {
+        let xword = CrosswordArgs {
             width: 2,
             height: 2,
             grid: vec![
@@ -249,7 +254,29 @@ mod tests {
             copyright: String::new(),
             notes: String::new(),
         };
-        let puz = xword.as_puz();
+        let xword = xword.validate().unwrap();
+        let puz = xword.to_puz();
         assert_eq!(puz, include_bytes!("test_files/smol.puz"));
+    }
+
+    #[test]
+    fn test_one_long() {
+        // one-long areas do NOT get clues.
+        let xword = CrosswordArgs {
+            width: 2,
+            height: 1,
+            grid: vec![
+                CrosswordCell::Char('A'), CrosswordCell::Char('B'),
+                CrosswordCell::Char('C'), CrosswordCell::Wall,
+            ],
+            across_clues: vec![(1, "Layout testing strategy".to_string())],
+            down_clues: vec![(1, "Initials in cooling".to_string())],
+            title: "one long".to_string(),
+            author: "me".to_string(),
+            copyright: String::new(),
+            notes: String::new(),
+        };
+        let xword = xword.validate().unwrap();
+        let _puz = xword.to_puz();
     }
 }

@@ -1,30 +1,30 @@
 use std::collections::HashMap;
 use wasm_bindgen::JsValue;
 
-#[derive(Default)]
-pub struct MultiError {
-    errors: HashMap<String, String>,
+#[derive(Debug)]
+pub struct MultiError<E> {
+    errors: HashMap<&'static str, E>,
 }
 
-impl MultiError {
+impl<E> MultiError<E> {
     pub(crate) fn new() -> Self {
-        Self::default()
+        Self { errors: HashMap::default() }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
 
-    pub(crate) fn push(&mut self, section: &str, msg: String) {
-        self.errors.insert(section.into(), msg);
+    pub(crate) fn insert(&mut self, section: &'static str, err: E) {
+        self.errors.insert(section, err);
     }
 
-    pub fn into_error_map(self) -> HashMap<String, String> {
+    pub fn into_error_map(self) -> HashMap<&'static str, E> {
         self.errors
     }
 }
 
-impl Into<JsValue> for MultiError {
+impl<E: serde::Serialize> Into<JsValue> for MultiError<E> {
     fn into(self) -> JsValue {
         serde_wasm_bindgen::to_value(&self.errors)
             .expect("map of strings to strings should be serializable")
