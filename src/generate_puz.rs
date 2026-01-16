@@ -1,13 +1,13 @@
+use crate::{Crossword, CrosswordCell};
+use encoding_rs::WINDOWS_1252;
+use packed_struct::prelude::*;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::iter::from_fn;
-use packed_struct::prelude::*;
-use encoding_rs::WINDOWS_1252;
-use crate::{Crossword, CrosswordCell};
 
 #[derive(PackedStruct)]
-#[packed_struct(endian="lsb")]
+#[packed_struct(endian = "lsb")]
 pub struct Header {
     checksum: u16,
     file_magic: [u8; 12],
@@ -126,17 +126,25 @@ struct PreserializedCrossword<'a> {
 
 impl Crossword {
     fn preserialize(&self) -> PreserializedCrossword<'_> {
-        let solution = self.grid.iter().map(|cell| match cell {
-            CrosswordCell::Char(c) => *c as u8,
-            CrosswordCell::Rebus(s) => s.bytes().next().expect("rebus may not be empty"),
-            CrosswordCell::Wall => b'.',
-            CrosswordCell::Empty => b'A', // XXX: ???
-        }).collect();
+        let solution = self
+            .grid
+            .iter()
+            .map(|cell| match cell {
+                CrosswordCell::Char(c) => *c as u8,
+                CrosswordCell::Rebus(s) => s.bytes().next().expect("rebus may not be empty"),
+                CrosswordCell::Wall => b'.',
+                CrosswordCell::Empty => b'A', // XXX: ???
+            })
+            .collect();
 
-        let grid = self.grid.iter().map(|cell| match cell {
-            CrosswordCell::Wall => b'.',
-            _ => b'-',
-        }).collect();
+        let grid = self
+            .grid
+            .iter()
+            .map(|cell| match cell {
+                CrosswordCell::Wall => b'.',
+                _ => b'-',
+            })
+            .collect();
 
         // Clues are represented as a single list with no numbers.
         // Numbers are inferred from the shape of the grid.
@@ -157,8 +165,10 @@ impl Crossword {
                 Some(Ordering::Equal) => across.next(),
                 Some(Ordering::Greater) => down.next(),
                 None => None,
-            }.map(|(_, clue)| WINDOWS_1252.encode(&clue).0)
-        }).collect();
+            }
+            .map(|(_, clue)| WINDOWS_1252.encode(clue).0)
+        })
+        .collect();
 
         PreserializedCrossword {
             width: self.width,
@@ -179,11 +189,12 @@ impl Crossword {
         puz.extend(this.solution);
         puz.extend(this.grid);
 
-        let lines = [&this.title, &this.author, &this.copyright].into_iter()
+        let lines = [&this.title, &this.author, &this.copyright]
+            .into_iter()
             .chain(&this.clues)
             .chain([&this.notes]);
         for line in lines {
-            puz.extend(line.into_iter());
+            puz.extend(line.iter());
             puz.push(0);
         }
         puz.extend(build_rebus_sections(self));
@@ -192,26 +203,27 @@ impl Crossword {
 }
 
 fn build_rebus_sections(xword: &Crossword) -> Vec<u8> {
-    let mut max_rebus = 0;  // the musician?
+    let mut max_rebus = 0; // the musician?
     let mut seen_rebus: HashMap<&str, u8> = HashMap::new();
     let mut rebus_words = Vec::new();
 
-    let rebus_grid: Vec<_> = xword.grid.iter().map(|cell| {
-        match cell {
-            CrosswordCell::Rebus(s) => {
-                *seen_rebus.entry(s)
-                    .or_insert_with(|| {
-                        rebus_words.extend(format!("{max_rebus:>2}:{s};").bytes());
-                        max_rebus += 1;
-                        max_rebus
-                    })
-            }
+    let rebus_grid: Vec<_> = xword
+        .grid
+        .iter()
+        .map(|cell| match cell {
+            CrosswordCell::Rebus(s) => *seen_rebus.entry(s).or_insert_with(|| {
+                rebus_words.extend(format!("{max_rebus:>2}:{s};").bytes());
+                max_rebus += 1;
+                max_rebus
+            }),
             _ => 0,
-        }
-    }).collect();
+        })
+        .collect();
 
     let mut out = Vec::new();
-    if seen_rebus.is_empty() { return out }
+    if seen_rebus.is_empty() {
+        return out;
+    }
     out.extend(extra_section(*b"GRBS", &rebus_grid));
     out.extend(extra_section(*b"RTBL", &rebus_words));
     out

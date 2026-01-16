@@ -8,7 +8,9 @@ pub struct MultiError<E> {
 
 impl<E> MultiError<E> {
     pub(crate) fn new() -> Self {
-        Self { errors: HashMap::default() }
+        Self {
+            errors: HashMap::default(),
+        }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -24,9 +26,9 @@ impl<E> MultiError<E> {
     }
 }
 
-impl<E: serde::Serialize> Into<JsValue> for MultiError<E> {
-    fn into(self) -> JsValue {
-        serde_wasm_bindgen::to_value(&self.errors)
+impl<E: serde::Serialize> From<MultiError<E>> for JsValue {
+    fn from(err: MultiError<E>) -> JsValue {
+        serde_wasm_bindgen::to_value(&err.errors)
             .expect("map of strings to strings should be serializable")
     }
 }

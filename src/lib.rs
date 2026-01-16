@@ -1,8 +1,8 @@
 mod generate_puz;
 mod multi_error;
 
-use std::iter::zip;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::iter::zip;
 use wasm_bindgen::prelude::*;
 
 pub type MultiError = crate::multi_error::MultiError<ValidationError>;
@@ -10,10 +10,7 @@ pub type MultiError = crate::multi_error::MultiError<ValidationError>;
 #[derive(thiserror::Error, Debug)]
 pub enum ValidationError {
     #[error("expected {expected} clues, found {actual}")]
-    MismatchedClueCount {
-        expected: usize,
-        actual: usize,
-    },
+    MismatchedClueCount { expected: usize, actual: usize },
     #[error("found misordered clues. Clue numbers must be strictly increasing")]
     MisorderedClues,
     #[error("missing clue #{0}")]
@@ -27,13 +24,14 @@ pub enum ValidationError {
         width: u8,
         height: u8,
         grid_len: usize,
-    }
+    },
 }
 
 impl Serialize for ValidationError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         serializer.serialize_str(self.to_string().as_ref())
     }
 }
@@ -54,7 +52,9 @@ impl CrosswordCell {
 
 impl<'de> Deserialize<'de> for CrosswordCell {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let maybe_s: Option<String> = Deserialize::deserialize(deserializer)?;
         Ok(match maybe_s {
             Some(s) => {
@@ -85,8 +85,8 @@ pub struct Crossword {
 
 #[wasm_bindgen]
 pub fn generate_puz(blob: JsValue) -> Result<Vec<u8>, MultiError> {
-    let xword: CrosswordArgs = serde_wasm_bindgen::from_value(blob)
-        .expect("js object should be well-formed");
+    let xword: CrosswordArgs =
+        serde_wasm_bindgen::from_value(blob).expect("js object should be well-formed");
     let xword = xword.validate()?;
     Ok(xword.to_puz())
 }
@@ -141,7 +141,9 @@ impl CrosswordArgs {
             issues.insert("down_clues", err);
         }
 
-        if !issues.is_empty() { return Err(issues) }
+        if !issues.is_empty() {
+            return Err(issues);
+        }
 
         let CrosswordArgs {
             width,
@@ -193,15 +195,16 @@ impl CrosswordArgs {
             let actual = actual.len();
             return Err(ValidationError::MismatchedClueCount { expected, actual });
         }
-        let mismatch =
-            zip(expected, actual)
+        let mismatch = zip(expected, actual)
             .map(|(&a, &(b, _))| (a, b))
-            .filter(|(a, b)| a != b)
-            .next();
+            .find(|(a, b)| a != b);
         if let Some((exp, act)) = mismatch {
-            let err = if exp < act { ValidationError::MissingClue(exp) }
-                else { ValidationError::ExtraClue(act) };
-            return Err(err)
+            let err = if exp < act {
+                ValidationError::MissingClue(exp)
+            } else {
+                ValidationError::ExtraClue(act)
+            };
+            return Err(err);
         }
         Ok(())
     }
@@ -214,7 +217,9 @@ impl CrosswordArgs {
         let mut down = Vec::new();
         let mut num = 1;
         for (idx, cell) in self.grid.iter().enumerate() {
-            if cell.is_wall() { continue; }
+            if cell.is_wall() {
+                continue;
+            }
             let x = idx % width;
             let y = idx / width;
             let left_wall = x == 0 || self.grid[idx - 1].is_wall();
