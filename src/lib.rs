@@ -70,7 +70,7 @@ impl<'de> Deserialize<'de> for CrosswordCell {
     }
 }
 
-#[wasm_bindgen]
+/// Validated crossword struct
 pub struct Crossword {
     width: u8,
     height: u8,

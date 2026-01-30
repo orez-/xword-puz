@@ -5,6 +5,17 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::iter::from_fn;
 
+// The lifecycle for a crossword is:
+// - `CrosswordArgs`: simple, unvalidated container of named fields
+//   for the user to populate.
+// - `CrosswordArgs::validate` -> `Crossword`: validated version of the crossword.
+// - `Crossword::preserialize` -> `PreserializedCrossword`: intermediate struct
+//   of the data in a format more closely representative of the bytes in the `.puz`.
+//   We convert some of these into the `Header`, and use some of them directly in
+//   the `.puz` bytes.
+// - `Header::new`: generated from the `PreserializedCrossword`. These bytes are
+//   directly plopped into the start of the `.puz` file.
+
 #[derive(PackedStruct)]
 #[packed_struct(endian = "lsb")]
 pub struct Header {
@@ -115,6 +126,8 @@ fn cksum_region(base: &[u8], mut cksum: u16) -> u16 {
     cksum
 }
 
+/// Data about the crossword in a format that more closely matches
+/// the format used in the `.puz` file.
 struct PreserializedCrossword<'a> {
     width: u8,
     height: u8,
@@ -157,25 +170,9 @@ impl Crossword {
         // Numbers are inferred from the shape of the grid.
         // Both Across and Down clues are intermingled(!?): the clues
         // are in numeric order, favoring Across.
-        let mut across = self.across_clues.iter().peekable();
-        let mut down = self.down_clues.iter().peekable();
-        let clues = from_fn(|| {
-            let which = match (across.peek(), down.peek()) {
-                (Some((a, _)), Some((d, _))) => Some(a.cmp(d)),
-                (Some(_), None) => Some(Ordering::Less),
-                (None, Some(_)) => Some(Ordering::Greater),
-                (None, None) => None,
-            };
-
-            match which {
-                Some(Ordering::Less) => across.next(),
-                Some(Ordering::Equal) => across.next(),
-                Some(Ordering::Greater) => down.next(),
-                None => None,
-            }
+        let clues = merge_by(&self.across_clues, &self.down_clues, |(a, _), (d, _)| a.cmp(d))
             .map(|(_, clue)| encoding.encode(clue).0)
-        })
-        .collect();
+            .collect();
 
         PreserializedCrossword {
             width: self.width,
@@ -207,6 +204,33 @@ impl Crossword {
         puz.extend(build_rebus_sections(self));
         puz
     }
+}
+
+/// Merge two iterables (each sorted by `cmp`) into a single `cmp`-sorted iterator.
+///
+/// When two elements are equal by `cmp`, prefers `a`.
+fn merge_by<A, B, T, F>(a: A, b: B, cmp: F) -> impl Iterator<Item = T>
+where
+    A: IntoIterator<Item = T>,
+    B: IntoIterator<Item = T>,
+    F: Fn(&T, &T) -> Ordering,
+{
+    let mut a = a.into_iter().peekable();
+    let mut b = b.into_iter().peekable();
+    from_fn(move || {
+        let which = match (a.peek(), b.peek()) {
+            (Some(left), Some(right)) => cmp(left, right),
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => return None,
+        };
+
+        match which {
+            Ordering::Less => a.next(),
+            Ordering::Equal => a.next(),
+            Ordering::Greater => b.next(),
+        }
+    })
 }
 
 fn build_rebus_sections(xword: &Crossword) -> Vec<u8> {
