@@ -27,13 +27,6 @@ pub enum ValidationError {
     },
 }
 
-#[derive(Debug, Default, Clone, Copy, Deserialize)]
-#[serde(rename_all="lowercase")]
-pub enum Encoding {
-    #[default] Utf8,
-    Windows1252,
-}
-
 impl Serialize for ValidationError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -77,6 +70,7 @@ impl<'de> Deserialize<'de> for CrosswordCell {
     }
 }
 
+#[wasm_bindgen]
 pub struct Crossword {
     width: u8,
     height: u8,
@@ -87,70 +81,17 @@ pub struct Crossword {
     author: String,
     copyright: String,
     notes: String,
-    encoding: Encoding,
-}
-
-impl Crossword {
-    pub fn with_encoding(&mut self, encoding: Encoding) -> &mut Self {
-        self.encoding = encoding;
-        self
-    }
 }
 
 #[wasm_bindgen]
 pub fn generate_puz(blob: JsValue) -> Result<Vec<u8>, MultiError> {
-    let xword: CrosswordArgsJs =
+    let xword: CrosswordArgs =
         serde_wasm_bindgen::from_value(blob).expect("js object should be well-formed");
-    let CrosswordArgsJs {
-        width,
-        height,
-        grid,
-        across_clues,
-        down_clues,
-        title,
-        author,
-        copyright,
-        notes,
-        encoding,
-    } = xword;
-    let xword = CrosswordArgs {
-        width,
-        height,
-        grid,
-        across_clues,
-        down_clues,
-        title,
-        author,
-        copyright,
-        notes,
-    };
-    let mut xword = xword.validate()?;
-    Ok(xword.with_encoding(encoding).to_puz())
+    let xword = xword.validate()?;
+    Ok(xword.to_puz())
 }
 
 // ===
-
-/// Simple data struct for the crossword object.
-/// Can be converted into a `Crossword`.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CrosswordArgsJs {
-    width: u8,
-    height: u8,
-    grid: Vec<CrosswordCell>,
-    across_clues: Vec<(u16, String)>,
-    down_clues: Vec<(u16, String)>,
-    #[serde(default)]
-    title: String,
-    #[serde(default)]
-    author: String,
-    #[serde(default)]
-    copyright: String,
-    #[serde(default)]
-    notes: String,
-    #[serde(default)]
-    encoding: Encoding,
-}
 
 /// Simple data struct for the crossword object.
 /// Can be converted into a `Crossword`.
@@ -225,7 +166,6 @@ impl CrosswordArgs {
             author,
             copyright,
             notes,
-            encoding: Encoding::default(),
         };
         Ok(xword)
     }
@@ -300,16 +240,5 @@ impl CrosswordArgs {
             }
         }
         (across, down)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_encoding_serde() {
-        let encoding: Encoding = serde_json::from_str("\"windows1252\"").unwrap();
-        assert!(matches!(encoding, Encoding::Windows1252), "{encoding:?}");
     }
 }

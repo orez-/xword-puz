@@ -1,5 +1,5 @@
 use crate::{Crossword, CrosswordCell};
-use encoding_rs::{UTF_8, WINDOWS_1252};
+use encoding_rs::WINDOWS_1252;
 use packed_struct::prelude::*;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -125,14 +125,6 @@ struct PreserializedCrossword<'a> {
 }
 
 impl Crossword {
-    fn encoding(&self) -> &'static encoding_rs::Encoding {
-        use crate::Encoding as E;
-        match self.encoding {
-            E::Utf8 => UTF_8,
-            E::Windows1252 => WINDOWS_1252,
-        }
-    }
-
     fn preserialize(&self) -> PreserializedCrossword<'_> {
         let solution = self
             .grid
@@ -160,7 +152,6 @@ impl Crossword {
         // are in numeric order, favoring Across.
         let mut across = self.across_clues.iter().peekable();
         let mut down = self.down_clues.iter().peekable();
-        let encoding = self.encoding();
         let clues = from_fn(|| {
             let which = match (across.peek(), down.peek()) {
                 (Some((a, _)), Some((d, _))) => Some(a.cmp(d)),
@@ -175,7 +166,7 @@ impl Crossword {
                 Some(Ordering::Greater) => down.next(),
                 None => None,
             }
-            .map(|(_, clue)| encoding.encode(clue).0)
+            .map(|(_, clue)| WINDOWS_1252.encode(clue).0)
         })
         .collect();
 
@@ -185,10 +176,10 @@ impl Crossword {
             solution,
             grid,
             clues,
-            title: encoding.encode(&self.title).0,
-            author: encoding.encode(&self.author).0,
-            copyright: encoding.encode(&self.copyright).0,
-            notes: encoding.encode(&self.notes).0,
+            title: WINDOWS_1252.encode(&self.title).0,
+            author: WINDOWS_1252.encode(&self.author).0,
+            copyright: WINDOWS_1252.encode(&self.copyright).0,
+            notes: WINDOWS_1252.encode(&self.notes).0,
         }
     }
 
