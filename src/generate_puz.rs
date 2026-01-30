@@ -1,5 +1,4 @@
 use crate::{Crossword, CrosswordCell};
-use encoding_rs::WINDOWS_1252;
 use packed_struct::prelude::*;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -31,14 +30,14 @@ impl Header {
             file_magic: *b"ACROSS&DOWN\0",
             cib_checksum: 0,
             masked_checksums: *b"ICHEATED",
-            version_string: *b"1.2\0",
+            version_string: *b"2.0\0",
             reserved_1c: 0,
             scrambled_checksum: 0,
             reserved_20: [0; 12],
             width: crossword.width,
             height: crossword.height,
             clue_count: crossword.clues.len() as u16,
-            unknown_bitmask: 0,
+            unknown_bitmask: 1, // Set to match oracle, not by the spec.
             scrambled_tag: 0,
         };
         this.generate_checksums(crossword);
@@ -74,26 +73,30 @@ impl Header {
     fn generate_meta_checksum(crossword: &PreserializedCrossword, initial: u16) -> u16 {
         let mut cksum = initial;
 
-        // TODO: i think we gotta hash the null terminator too.
+        // we need to hash the null terminator on these meta fields
         if !crossword.title.is_empty() {
             cksum = cksum_region(&crossword.title, cksum);
+            cksum = cksum_region(&[0], cksum);
         }
 
         if !crossword.author.is_empty() {
             cksum = cksum_region(&crossword.author, cksum);
+            cksum = cksum_region(&[0], cksum);
         }
 
         if !crossword.copyright.is_empty() {
             cksum = cksum_region(&crossword.copyright, cksum);
+            cksum = cksum_region(&[0], cksum);
         }
 
         for clue in &crossword.clues {
-            // XXX: but maybe we dont hash the null terminator for the clues??
+            // weirdly, we DONT hash the null terminator for the clues
             cksum = cksum_region(clue, cksum);
         }
 
-        if crossword.notes.is_empty() {
+        if !crossword.notes.is_empty() {
             cksum = cksum_region(&crossword.notes, cksum);
+            cksum = cksum_region(&[0], cksum);
         }
         cksum
     }
@@ -126,6 +129,10 @@ struct PreserializedCrossword<'a> {
 
 impl Crossword {
     fn preserialize(&self) -> PreserializedCrossword<'_> {
+        // could just use rust's native utf8 string encoding, but
+        // I'm still not convinced I'm following the spec, and
+        // I don't want to have to rewrite this code again.
+        let encoding = encoding_rs::UTF_8;
         let solution = self
             .grid
             .iter()
@@ -166,7 +173,7 @@ impl Crossword {
                 Some(Ordering::Greater) => down.next(),
                 None => None,
             }
-            .map(|(_, clue)| WINDOWS_1252.encode(clue).0)
+            .map(|(_, clue)| encoding.encode(clue).0)
         })
         .collect();
 
@@ -176,10 +183,10 @@ impl Crossword {
             solution,
             grid,
             clues,
-            title: WINDOWS_1252.encode(&self.title).0,
-            author: WINDOWS_1252.encode(&self.author).0,
-            copyright: WINDOWS_1252.encode(&self.copyright).0,
-            notes: WINDOWS_1252.encode(&self.notes).0,
+            title: encoding.encode(&self.title).0,
+            author: encoding.encode(&self.author).0,
+            copyright: encoding.encode(&self.copyright).0,
+            notes: encoding.encode(&self.notes).0,
         }
     }
 
@@ -264,7 +271,45 @@ mod tests {
         };
         let xword = xword.validate().unwrap();
         let puz = xword.to_puz();
+
         assert_eq!(puz, include_bytes!("test_files/smol.puz"));
+    }
+
+    #[test]
+    fn test_encoding_oracle() {
+        let xword = CrosswordArgs {
+            width: 5,
+            height: 5,
+            grid: vec![
+                'A', 'A', 'H', 'E', 'D',
+                'A', 'N', 'A', 'I', 'S',
+                'B', 'O', 'R', 'E', 'S',
+                'B', 'A', 'T', 'I', 'N',
+                'A', 'S', 'E', 'A', 'T'
+            ].into_iter().map(CrosswordCell::Char).collect(),
+            across_clues: vec![
+                (1, "no".to_string()),
+                (6, "no".to_string()),
+                (7, "no".to_string()),
+                (8, "no".to_string()),
+                (9, "no".to_string()),
+            ],
+            down_clues: vec![
+                (1, "no".to_string()),
+                (2, "no".to_string()),
+                (3, "no".to_string()),
+                (4, "no".to_string()),
+                (5, "no".to_string()),
+            ],
+            title: "🫛 Test".to_string(),
+            author: "Anonymous".to_string(),
+            copyright: "Copyright Anonymous, all rights reserved".to_string(),
+            notes: "Created on crosshare.org".to_string(), // lol
+        };
+        let xword = xword.validate().unwrap();
+        let puz = xword.to_puz();
+
+        assert_eq!(puz, include_bytes!("test_files/encoding_oracle.puz"));
     }
 
     #[test]
