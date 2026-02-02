@@ -1,8 +1,11 @@
 mod generate_puz;
+mod generate_ipuz;
 mod multi_error;
+mod serde_lit;
+mod validation;
 
+use crate::validation::ClueError;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::iter::zip;
 use wasm_bindgen::prelude::*;
 
 pub type MultiError = crate::multi_error::MultiError<ValidationError>;
@@ -25,6 +28,18 @@ pub enum ValidationError {
         height: u8,
         grid_len: usize,
     },
+}
+
+impl From<ClueError> for ValidationError {
+    fn from(err: ClueError) -> ValidationError {
+        match err {
+            ClueError::MismatchedClueCount { expected, actual } =>
+                ValidationError::MismatchedClueCount { expected, actual },
+            ClueError::MisorderedClues => ValidationError::MisorderedClues,
+            ClueError::MissingClue(clue) => ValidationError::MissingClue(clue),
+            ClueError::ExtraClue(clue) => ValidationError::ExtraClue(clue),
+        }
+    }
 }
 
 impl Serialize for ValidationError {
@@ -83,6 +98,16 @@ pub struct Crossword {
     notes: String,
 }
 
+impl Crossword {
+    fn grid(&self) -> Grid<'_> {
+        Grid {
+            width: self.width,
+            height: self.height,
+            grid: &self.grid,
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub fn generate_puz(blob: JsValue) -> Result<Vec<u8>, MultiError> {
     let xword: CrosswordArgs =
@@ -133,12 +158,12 @@ impl CrosswordArgs {
             issues.insert("grid", err);
         }
 
-        let (across, down) = self.expected_grid_nums();
-        if let Err(err) = Self::validate_clues(&across, &self.across_clues) {
-            issues.insert("across_clues", err);
+        let (across, down) = self.grid().expected_grid_nums();
+        if let Err(err) = validation::validate_clues(&across, &self.across_clues) {
+            issues.insert("across_clues", err.into());
         }
-        if let Err(err) = Self::validate_clues(&down, &self.down_clues) {
-            issues.insert("down_clues", err);
+        if let Err(err) = validation::validate_clues(&down, &self.down_clues) {
+            issues.insert("down_clues", err.into());
         }
 
         if !issues.is_empty() {
@@ -186,39 +211,40 @@ impl CrosswordArgs {
         Ok(())
     }
 
-    fn validate_clues(expected: &[u16], actual: &[(u16, String)]) -> Result<(), ValidationError> {
-        if actual.windows(2).any(|w| w[0] >= w[1]) {
-            return Err(ValidationError::MisorderedClues);
+    fn grid(&self) -> Grid<'_> {
+        Grid {
+            width: self.width,
+            height: self.height,
+            grid: &self.grid,
         }
-        if expected.len() != actual.len() {
-            let expected = expected.len();
-            let actual = actual.len();
-            return Err(ValidationError::MismatchedClueCount { expected, actual });
-        }
-        let mismatch = zip(expected, actual)
-            .map(|(&a, &(b, _))| (a, b))
-            .find(|(a, b)| a != b);
-        if let Some((exp, act)) = mismatch {
-            let err = if exp < act {
-                ValidationError::MissingClue(exp)
-            } else {
-                ValidationError::ExtraClue(act)
-            };
-            return Err(err);
-        }
-        Ok(())
     }
+}
 
-    /// Given the shape of the grid, these are the numbers of each clue.
-    fn expected_grid_nums(&self) -> (Vec<u16>, Vec<u16>) {
+#[derive(Debug)]
+enum NumberedCell {
+    Wall,
+    Empty,
+    Numbered {
+        number: u16,
+        is_across: bool,
+        is_down: bool,
+    }
+}
+
+struct Grid<'xword> {
+    width: u8,
+    height: u8,
+    grid: &'xword [CrosswordCell],
+}
+
+impl<'xword> Grid<'xword> {
+    fn iter_numbered(&self) -> impl Iterator<Item = NumberedCell> {
         let width = self.width as usize;
         let height = self.height as usize;
-        let mut across = Vec::new();
-        let mut down = Vec::new();
-        let mut num = 1;
-        for (idx, cell) in self.grid.iter().enumerate() {
+        let mut number = 1;
+        self.grid.iter().enumerate().map(move |(idx, cell)| {
             if cell.is_wall() {
-                continue;
+                return NumberedCell::Wall;
             }
             let x = idx % width;
             let y = idx / width;
@@ -229,14 +255,31 @@ impl CrosswordArgs {
             // one-long areas do NOT get clues.
             let is_across = left_wall && !right_wall;
             let is_down = up_wall && !down_wall;
-            if is_across {
-                across.push(num);
+            if !is_across && !is_down {
+                return NumberedCell::Empty;
             }
-            if is_down {
-                down.push(num);
-            }
-            if is_across || is_down {
-                num += 1;
+            let out = NumberedCell::Numbered {
+                number,
+                is_across,
+                is_down,
+            };
+            number += 1;
+            out
+        })
+    }
+
+    /// Given the shape of the grid, these are the numbers of each clue.
+    fn expected_grid_nums(&self) -> (Vec<u16>, Vec<u16>) {
+        let mut across = Vec::new();
+        let mut down = Vec::new();
+        for cell in self.iter_numbered() {
+            if let NumberedCell::Numbered { number, is_across, is_down } = cell {
+                if is_across {
+                    across.push(number);
+                }
+                if is_down {
+                    down.push(number);
+                }
             }
         }
         (across, down)
