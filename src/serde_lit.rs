@@ -34,7 +34,7 @@ macro_rules! lit_str {
         impl<'de> serde::Deserialize<'de> for $struct_name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
-                D: serde::Deserializer<'de>
+                D: serde::Deserializer<'de>,
             {
                 deserializer.deserialize_str($crate::serde_lit::LitStr($val))?;
                 Ok(Self)
@@ -43,7 +43,8 @@ macro_rules! lit_str {
 
         impl serde::Serialize for $struct_name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-               where S: serde::Serializer
+            where
+                S: serde::Serializer,
             {
                 serializer.serialize_str($val)
             }

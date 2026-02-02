@@ -10,14 +10,14 @@
 // Big ol' open-ended json blob.
 // I do not care for it.
 
+use crate::lit_str;
+use crate::multi_error::MultiError;
+use crate::validation::{ClueError, validate_clues};
+use crate::{Crossword, CrosswordCell, Grid, NumberedCell};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::zip;
-use crate::{Crossword, CrosswordCell, Grid, NumberedCell};
-use crate::multi_error::MultiError;
-use crate::lit_str;
-use crate::validation::{ClueError, validate_clues};
-use serde::{Deserialize, Serialize};
 
 lit_str!(Version, "http://ipuz.org/v1");
 lit_str!(Kind, "http://ipuz.org/crossword#1");
@@ -25,7 +25,7 @@ lit_str!(Kind, "http://ipuz.org/crossword#1");
 type ClueList = Vec<(u16, String)>;
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all="PascalCase")]
+#[serde(rename_all = "PascalCase")]
 struct Clues<'a> {
     #[serde(borrow)]
     across: Cow<'a, ClueList>,
@@ -50,17 +50,16 @@ enum DeserializeError {
     #[error("found extraneous clue #{0}")]
     ExtraClue(u16),
     #[error("grid is height {height}, but found {actual} rows")]
-    InvalidHeight {
-        height: usize,
-        actual: usize,
-    },
+    InvalidHeight { height: usize, actual: usize },
     #[error("grid is width {width}, but row {row} is length {actual}")]
     InvalidWidth {
         row: usize,
         width: usize,
         actual: usize,
     },
-    #[error("invalid solution item at {row},{col}: expected string or block ({block}), but found {actual}")]
+    #[error(
+        "invalid solution item at {row},{col}: expected string or block ({block}), but found {actual}"
+    )]
     InvalidSolutionItem {
         row: usize,
         col: usize,
@@ -85,8 +84,9 @@ enum DeserializeError {
 impl From<ClueError> for DeserializeError {
     fn from(err: ClueError) -> DeserializeError {
         match err {
-            ClueError::MismatchedClueCount { expected, actual } =>
-                DeserializeError::MismatchedClueCount { expected, actual },
+            ClueError::MismatchedClueCount { expected, actual } => {
+                DeserializeError::MismatchedClueCount { expected, actual }
+            }
             ClueError::MisorderedClues => DeserializeError::MisorderedClues,
             ClueError::MissingClue(clue) => DeserializeError::MissingClue(clue),
             ClueError::ExtraClue(clue) => DeserializeError::ExtraClue(clue),
@@ -104,11 +104,13 @@ fn validate_dimensions<T>(dim: Dimensions, puzzle: &[Vec<T>]) -> Result<(), Dese
         };
         return Err(err);
     }
-    let err = puzzle.iter().enumerate().find_map(|(row, r)| (r.len() != width).then_some(DeserializeError::InvalidWidth {
-        row,
-        width,
-        actual: r.len(),
-    }));
+    let err = puzzle.iter().enumerate().find_map(|(row, r)| {
+        (r.len() != width).then_some(DeserializeError::InvalidWidth {
+            row,
+            width,
+            actual: r.len(),
+        })
+    });
     // wish there were an idiom for `Option<E>` -> `Result<(), E>`
     if let Some(err) = err {
         return Err(err);
@@ -128,9 +130,9 @@ struct IPuzRaw<'a> {
     author: &'a str,
     notes: &'a str,
     dimensions: Dimensions,
-    #[serde(default="default_block")]
+    #[serde(default = "default_block")]
     block: StringOrNum,
-    #[serde(default="default_empty")]
+    #[serde(default = "default_empty")]
     empty: StringOrNum,
     puzzle: Vec<Vec<LabeledCell>>,
     solution: Vec<Vec<CrosswordValue>>,
@@ -180,10 +182,16 @@ enum LabeledCell {
 
 impl LabeledCell {
     fn cell(num: i32) -> Self {
-        LabeledCell::Cell { cell: StringOrNum::Num(num) }
+        LabeledCell::Cell {
+            cell: StringOrNum::Num(num),
+        }
     }
 
-    fn to_value(&self, block: &StringOrNum, empty: &StringOrNum) -> Result<LabeledCellValue, LabeledCellError> {
+    fn to_value(
+        &self,
+        block: &StringOrNum,
+        empty: &StringOrNum,
+    ) -> Result<LabeledCellValue, LabeledCellError> {
         let sorn: &StringOrNum = self.into();
         match sorn {
             sorn if sorn == block => Ok(LabeledCellValue::Block),
@@ -261,25 +269,34 @@ impl<'a> From<&'a Crossword> for IPuzRaw<'a> {
         let chunk = *width as usize;
 
         let empty = default_empty();
-        let empty_cell = LabeledCell::Cell { cell: empty.clone() };
+        let empty_cell = LabeledCell::Cell {
+            cell: empty.clone(),
+        };
         let block = default_block();
         let block_cell = LabeledCell::Raw(block.clone());
-        let puzzle: Vec<_> = xword.grid().iter_numbered().map(|cell| match cell {
-            NumberedCell::Wall => block_cell.clone(),
-            NumberedCell::Empty => empty_cell.clone(),
-            NumberedCell::Numbered { number, .. } => LabeledCell::cell(number.into()),
-        }).collect();
+        let puzzle: Vec<_> = xword
+            .grid()
+            .iter_numbered()
+            .map(|cell| match cell {
+                NumberedCell::Wall => block_cell.clone(),
+                NumberedCell::Empty => empty_cell.clone(),
+                NumberedCell::Numbered { number, .. } => LabeledCell::cell(number.into()),
+            })
+            .collect();
         let puzzle = puzzle.chunks(chunk).map(|c| c.to_vec()).collect();
         let block_ref = &block;
-        let solution: Vec<_> = grid.iter().map(move |cell| {
-            let s = match cell {
-                CrosswordCell::Empty => String::new(), // XXX: ?
-                CrosswordCell::Char(c) => c.to_string(),
-                CrosswordCell::Rebus(s) => s.to_string(),
-                CrosswordCell::Wall => return block_ref.clone(),
-            };
-            StringOrNum::String(s)
-        }).collect();
+        let solution: Vec<_> = grid
+            .iter()
+            .map(move |cell| {
+                let s = match cell {
+                    CrosswordCell::Empty => String::new(), // XXX: ?
+                    CrosswordCell::Char(c) => c.to_string(),
+                    CrosswordCell::Rebus(s) => s.to_string(),
+                    CrosswordCell::Wall => return block_ref.clone(),
+                };
+                StringOrNum::String(s)
+            })
+            .collect();
         let solution = solution.chunks(chunk).map(|c| c.to_vec()).collect();
 
         IPuzRaw {
@@ -321,10 +338,7 @@ impl<'a> TryFrom<IPuzRaw<'a>> for Crossword {
             empty,
             puzzle,
             solution,
-            clues: Clues {
-                across,
-                down,
-            },
+            clues: Clues { across, down },
         } = ipuz;
         let mut issues = MultiError::new();
 
@@ -341,29 +355,36 @@ impl<'a> TryFrom<IPuzRaw<'a>> for Crossword {
         }
 
         let width = dimensions.width as usize;
-        let raw_grid: Result<Vec<_>, _> = solution.into_iter().flatten().enumerate().map(|(idx, elem)| {
-            if elem == block { return Ok(CrosswordCell::Wall) }
-            let StringOrNum::String(elem) = elem else {
-                let err = DeserializeError::InvalidSolutionItem {
-                    row: idx / width,
-                    col: idx % width,
-                    block: block.clone(),
-                    actual: elem,
+        let raw_grid: Result<Vec<_>, _> = solution
+            .into_iter()
+            .flatten()
+            .enumerate()
+            .map(|(idx, elem)| {
+                if elem == block {
+                    return Ok(CrosswordCell::Wall);
+                }
+                let StringOrNum::String(elem) = elem else {
+                    let err = DeserializeError::InvalidSolutionItem {
+                        row: idx / width,
+                        col: idx % width,
+                        block: block.clone(),
+                        actual: elem,
+                    };
+                    return Err(err);
                 };
-                return Err(err);
-            };
-            // XXX: we don't currently support non-ascii-alphabetical.
-            // if we did, we'd need to rethink this bytesy splat.
-            //
-            // ...we also don't ever validate that the fill is ascii, and really,
-            // TODO: we should.
-            let cell = match elem.as_bytes() {
-                [] => CrosswordCell::Empty,
-                &[b] => CrosswordCell::Char(b as char),
-                _ => CrosswordCell::Rebus(elem.to_owned()),
-            };
-            Ok(cell)
-        }).collect();
+                // XXX: we don't currently support non-ascii-alphabetical.
+                // if we did, we'd need to rethink this bytesy splat.
+                //
+                // ...we also don't ever validate that the fill is ascii, and really,
+                // TODO: we should.
+                let cell = match elem.as_bytes() {
+                    [] => CrosswordCell::Empty,
+                    &[b] => CrosswordCell::Char(b as char),
+                    _ => CrosswordCell::Rebus(elem.to_owned()),
+                };
+                Ok(cell)
+            })
+            .collect();
         let raw_grid = match raw_grid {
             Ok(g) => g,
             Err(err) => {
@@ -379,24 +400,28 @@ impl<'a> TryFrom<IPuzRaw<'a>> for Crossword {
         };
 
         let puzzle = puzzle.into_iter().flatten();
-        let puzzle_error = zip(grid.iter_numbered(), puzzle).enumerate().try_for_each(|(idx, (num_cell, lab_cell))| {
-            let lab_cell = lab_cell.to_value(&block, &empty).map_err(|error| DeserializeError::LabeledCellError {
-                row: idx / width,
-                col: idx % width,
-                error,
-            })?;
-            let num_cell = num_cell.into();
-            if lab_cell != num_cell {
-                let err = DeserializeError::InvalidNumbering {
-                    row: idx / width,
-                    col: idx % width,
-                    expected: num_cell,
-                    actual: lab_cell,
-                };
-                return Err(err)
-            }
-            Ok(())
-        });
+        let puzzle_error = zip(grid.iter_numbered(), puzzle).enumerate().try_for_each(
+            |(idx, (num_cell, lab_cell))| {
+                let lab_cell = lab_cell.to_value(&block, &empty).map_err(|error| {
+                    DeserializeError::LabeledCellError {
+                        row: idx / width,
+                        col: idx % width,
+                        error,
+                    }
+                })?;
+                let num_cell = num_cell.into();
+                if lab_cell != num_cell {
+                    let err = DeserializeError::InvalidNumbering {
+                        row: idx / width,
+                        col: idx % width,
+                        expected: num_cell,
+                        actual: lab_cell,
+                    };
+                    return Err(err);
+                }
+                Ok(())
+            },
+        );
         if let Err(error) = puzzle_error {
             issues.insert("puzzle", error);
         }

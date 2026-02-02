@@ -1,5 +1,5 @@
-mod generate_puz;
 mod generate_ipuz;
+mod generate_puz;
 mod multi_error;
 mod serde_lit;
 mod validation;
@@ -33,8 +33,9 @@ pub enum ValidationError {
 impl From<ClueError> for ValidationError {
     fn from(err: ClueError) -> ValidationError {
         match err {
-            ClueError::MismatchedClueCount { expected, actual } =>
-                ValidationError::MismatchedClueCount { expected, actual },
+            ClueError::MismatchedClueCount { expected, actual } => {
+                ValidationError::MismatchedClueCount { expected, actual }
+            }
             ClueError::MisorderedClues => ValidationError::MisorderedClues,
             ClueError::MissingClue(clue) => ValidationError::MissingClue(clue),
             ClueError::ExtraClue(clue) => ValidationError::ExtraClue(clue),
@@ -228,7 +229,7 @@ enum NumberedCell {
         number: u16,
         is_across: bool,
         is_down: bool,
-    }
+    },
 }
 
 struct Grid<'xword> {
