@@ -26,6 +26,16 @@ impl<E> MultiError<E> {
     }
 }
 
+impl<E, const N: usize> From<[(&'static str, E); N]> for MultiError<E> {
+    fn from(it: [(&'static str, E); N]) -> Self {
+        let mut this = Self::new();
+        for (k, v) in it {
+            this.insert(k, v);
+        }
+        this
+    }
+}
+
 impl<E: serde::Serialize> From<MultiError<E>> for JsValue {
     fn from(err: MultiError<E>) -> JsValue {
         serde_wasm_bindgen::to_value(&err.errors)

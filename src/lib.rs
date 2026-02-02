@@ -28,6 +28,10 @@ pub enum ValidationError {
         height: u8,
         grid_len: usize,
     },
+    #[error("{0}")]
+    EncodingError(#[from] EncodingError),
+    #[error("Unrecognized export format. Expected \"puz1.2\", \"puz2.0\", or \"ipuz\"")]
+    UnrecognizedFileFormat,
 }
 
 impl From<ClueError> for ValidationError {
@@ -50,6 +54,12 @@ impl Serialize for ValidationError {
     {
         serializer.serialize_str(self.to_string().as_ref())
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("encoding error in {field}")]
+pub struct EncodingError {
+    field: String,
 }
 
 #[derive(Debug)]
@@ -86,6 +96,27 @@ impl<'de> Deserialize<'de> for CrosswordCell {
     }
 }
 
+#[non_exhaustive]
+pub enum FileFormat {
+    Puz12,
+    Puz20,
+    IPuz,
+}
+
+impl std::str::FromStr for FileFormat {
+    type Err = ValidationError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let fmt = match s {
+            "puz1.2" => FileFormat::Puz12,
+            "puz2.0" => FileFormat::Puz20,
+            "ipuz" => FileFormat::IPuz,
+            _ => return Err(ValidationError::UnrecognizedFileFormat),
+        };
+        Ok(fmt)
+    }
+}
+
 /// Validated crossword struct
 pub struct Crossword {
     width: u8,
@@ -107,14 +138,28 @@ impl Crossword {
             grid: &self.grid,
         }
     }
+
+    pub fn export(&self, format: FileFormat) -> Result<Vec<u8>, EncodingError> {
+        match format {
+            FileFormat::Puz12 => self.to_puz(*b"1.2\0"),
+            FileFormat::Puz20 => self.to_puz(*b"2.0\0"),
+            FileFormat::IPuz => Ok(self.to_ipuz()),
+        }
+    }
 }
 
 #[wasm_bindgen]
-pub fn generate_puz(blob: JsValue) -> Result<Vec<u8>, MultiError> {
+pub fn generate_puz(blob: JsValue, file_format: String) -> Result<Vec<u8>, MultiError> {
+    let format = file_format.parse().map_err(|err| {
+        MultiError::from([("format", err)])
+    })?;
     let xword: CrosswordArgs =
         serde_wasm_bindgen::from_value(blob).expect("js object should be well-formed");
     let xword = xword.validate()?;
-    Ok(xword.to_puz())
+    let puz = xword.export(format).map_err(|err| {
+        MultiError::from([("encoding", err.into())])
+    })?;
+    Ok(puz)
 }
 
 // ===

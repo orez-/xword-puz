@@ -1,4 +1,4 @@
-use crate::{Crossword, CrosswordCell};
+use crate::{Crossword, CrosswordCell, EncodingError};
 use packed_struct::prelude::*;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -41,7 +41,7 @@ impl Header {
             file_magic: *b"ACROSS&DOWN\0",
             cib_checksum: 0,
             masked_checksums: *b"ICHEATED",
-            version_string: *b"2.0\0",
+            version_string: crossword.version,
             reserved_1c: 0,
             scrambled_checksum: 0,
             reserved_20: [0; 12],
@@ -138,14 +138,19 @@ struct PreserializedCrossword<'a> {
     author: Cow<'a, [u8]>,
     copyright: Cow<'a, [u8]>,
     notes: Cow<'a, [u8]>,
+    version: [u8; 4],
 }
 
 impl Crossword {
-    fn preserialize(&self) -> PreserializedCrossword<'_> {
-        // could just use rust's native utf8 string encoding, but
-        // I'm still not convinced I'm following the spec, and
-        // I don't want to have to rewrite this code again.
-        let encoding = encoding_rs::UTF_8;
+    fn preserialize(&self, version: [u8; 4]) -> Result<PreserializedCrossword<'_>, EncodingError> {
+        // As near as I can tell, version 2.0 is identical to 1.2,
+        // except for the encoding.
+        // Excited to be proven wrong about this immediately ᖍ(∙⥚∙)ᖌ
+        let encoding = match &version {
+            b"1.2\0" => encoding_rs::WINDOWS_1252,
+            b"2.0\0" => encoding_rs::UTF_8,
+            _ => panic!(),
+        };
         let solution = self
             .grid
             .iter()
@@ -170,25 +175,34 @@ impl Crossword {
         // Numbers are inferred from the shape of the grid.
         // Both Across and Down clues are intermingled(!?): the clues
         // are in numeric order, favoring Across.
-        let clues = merge_by(&self.across_clues, &self.down_clues, |(a, _), (d, _)| a.cmp(d))
-            .map(|(_, clue)| encoding.encode(clue).0)
-            .collect();
+        fn augment<'a, F: Fn(u16) -> String + 'a>(clues: &'a [(u16, String)], f: F) -> impl Iterator<Item = (u16, &'a str, String)> + 'a {
+            clues.iter().map(move |&(n, ref c)| (n, c.as_str(), f(n)))
+        }
 
-        PreserializedCrossword {
+        let across = augment(&self.across_clues, |n| format!("clue {n}A"));
+        let down = augment(&self.down_clues, |n| format!("clue {n}D"));
+        let clues: Result<Vec<_>, _> = merge_by(across, down, |a, d| a.0.cmp(&d.0))
+            .map(|(_, clue, field)| encode(encoding, clue, &field))
+            .collect();
+        let clues = clues?;
+
+        let xword = PreserializedCrossword {
             width: self.width,
             height: self.height,
             solution,
             grid,
             clues,
-            title: encoding.encode(&self.title).0,
-            author: encoding.encode(&self.author).0,
-            copyright: encoding.encode(&self.copyright).0,
-            notes: encoding.encode(&self.notes).0,
-        }
+            title: encode(encoding, &self.title, "title")?,
+            author: encode(encoding, &self.author, "author")?,
+            copyright: encode(encoding, &self.copyright, "copyright")?,
+            notes: encode(encoding, &self.notes, "notes")?,
+            version,
+        };
+        Ok(xword)
     }
 
-    pub fn to_puz(&self) -> Vec<u8> {
-        let this = self.preserialize();
+    pub(crate) fn to_puz(&self, version: [u8; 4]) -> Result<Vec<u8>, EncodingError> {
+        let this = self.preserialize(version)?;
         let mut puz = Header::new(&this).pack().unwrap().to_vec();
         puz.extend(this.solution);
         puz.extend(this.grid);
@@ -202,8 +216,23 @@ impl Crossword {
             puz.push(0);
         }
         puz.extend(build_rebus_sections(self));
-        puz
+        Ok(puz)
     }
+}
+
+fn encode<'a>(encoding: &'static encoding_rs::Encoding, string: &'a str, field: &str) -> Result<Cow<'a, [u8]>, EncodingError> {
+    // learning three years later that encoding_rs is specifically
+    // for web encoding, and thus silently encodes unrepresentable characters
+    // as an html entity. It denotes that it did this with a `bool` in the
+    // return tuple, like a Go library.
+    let (out, _, failed) = encoding.encode(string);
+    if failed {
+        // TODO: might be nice to use an encoding library that told you where the issue is,
+        // so you could pass that along as feedback to the user.
+        // Right now I'd rather the devil I know.
+        return Err(EncodingError { field: field.to_owned() })
+    }
+    Ok(out)
 }
 
 /// Merge two iterables (each sorted by `cmp`) into a single `cmp`-sorted iterator.
@@ -294,7 +323,7 @@ mod tests {
             notes: String::new(),
         };
         let xword = xword.validate().unwrap();
-        let puz = xword.to_puz();
+        let puz = xword.to_puz(*b"2.0\0").unwrap();
 
         assert_eq!(puz, include_bytes!("test_files/smol.puz"));
     }
@@ -331,7 +360,7 @@ mod tests {
             notes: "Created on crosshare.org".to_string(), // lol
         };
         let xword = xword.validate().unwrap();
-        let puz = xword.to_puz();
+        let puz = xword.to_puz(*b"2.0\0").unwrap();
 
         assert_eq!(puz, include_bytes!("test_files/encoding_oracle.puz"));
     }
@@ -354,6 +383,6 @@ mod tests {
             notes: String::new(),
         };
         let xword = xword.validate().unwrap();
-        let _puz = xword.to_puz();
+        let _puz = xword.to_puz(*b"2.0\0").unwrap();
     }
 }
