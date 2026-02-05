@@ -9,12 +9,13 @@ cargo add --git https://github.com/orez-/xword-puz.git
 ```
 
 ```rust
+let format = FileFormat::Puz12;
 let xword = CrosswordArgs {
     width, height, grid,
     title, author, copyright, notes,
     across_clues, down_clues,
 };
-let puz_contents = xword.validate()?.to_puz();
+let puz_contents = xword.validate()?.export(format)?;
 ```
 
 ## Usage (wasm library)
@@ -27,11 +28,13 @@ npm install --save https://github.com/orez-/xword-puz/releases/download/0.2.0/xw
 import init, { generate_puz } from "xword-puz";
 await init();
 
+const format = "puz1.2"; // one of "puz1.2", "puz2.0", or "ipuz"
+
 const puzContents = generate_puz({
     width, height, grid,
     title, author, copyright, notes,
     acrossClues, downClues,
-});
+}, format);
 ```
 
 ## `CrosswordArgs`
